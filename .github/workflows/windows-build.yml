@@ -52,6 +52,19 @@ jobs:
             exit 1
           }
 
+      - name: Run the EXE and check for errors
+        shell: pwsh
+        run: |
+          try {
+            & dist\PDFReader.exe *> output.log
+            Write-Output "EXE ran successfully. Output:"
+            Get-Content output.log
+          } catch {
+            Write-Error "The EXE failed to run. Output:"
+            Get-Content output.log
+            exit 1
+          }
+
       - name: Upload built EXE
         uses: actions/upload-artifact@v4
         with:
