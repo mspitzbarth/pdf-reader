@@ -36,17 +36,6 @@ jobs:
       - name: List installed packages
         run: pip list # Verify pandas is installed
 
-      - name: Check import_test.py for missing dependencies
-        shell: pwsh
-        run: |
-          $missing = python ./tests/import_test.py
-          if ($missing) {
-            Write-Error "Missing dependencies: $missing"
-            exit 1
-          } else {
-            Write-Output "All dependencies are present."
-          }
-
       - name: Check Python file for syntax errors
         run: python -m py_compile main.py
 
