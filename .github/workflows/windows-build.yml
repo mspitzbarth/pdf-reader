@@ -22,19 +22,18 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pandas numpy pdfplumber openpyxl tkinterdnd2
+          pip install -r requirements.txt
           pip install pyinstaller pyinstaller-hooks-contrib
 
       - name: Check import_test.py for missing dependencies
         shell: pwsh
         run: |
-          # Check for missing dependencies in import_test.py
-          $missing = python ./tests/import_test.py
-          if ($missing) {
-            Write-Error "Missing dependencies: $missing"
+          $output = python ./tests/import_test.py
+          if ($output -match "Missing dependency") {
+            Write-Error "Missing dependencies: $output"
             exit 1
           } else {
-            Write-Output "All dependencies are present."
+            Write-Output $output
           }
 
       - name: Check Python file for syntax errors
