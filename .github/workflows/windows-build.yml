@@ -17,9 +17,7 @@ jobs:
       - name: Cache Python dependencies
         uses: actions/cache@v3
         with:
-          path: |
-            ~/.cache/pip
-            C:\hostedtoolcache\windows\Python\3.7.9
+          path: ~/.cache/pip # Only cache the pip cache
           key: ${{ runner.os }}-python-${{ hashFiles('requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-python-
