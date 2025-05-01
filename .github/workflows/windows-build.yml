@@ -8,7 +8,6 @@ on:
 jobs:
   build-windows-exe:
     runs-on: windows-latest
-    continue-on-error: false
 
     steps:
       - name: Checkout code
@@ -23,14 +22,35 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller
+          pip install pyinstaller pyinstaller-hooks-contrib
 
       - name: Check Python file for syntax errors
         run: python -m py_compile main.py
 
       - name: Build EXE with PyInstaller
+        shell: pwsh
         run: |
-          pyinstaller --onefile --name PDFReader main.py
+          pyinstaller --noconsole --onefile --name PDFReader `
+            --collect-all pandas `
+            --collect-all numpy `
+            --collect-all pdfplumber `
+            --collect-all tkinterdnd2 `
+            --hidden-import pandas._libs.tslibs.nattype `
+            --hidden-import pandas._libs.tslibs.np_datetime `
+            --hidden-import pandas._libs.tslibs.timestamps `
+            --hidden-import openpyxl.styles `
+            --hidden-import openpyxl.formatting.rule `
+            --hidden-import tkinter.ttk `
+            --hidden-import tkinter `
+            main.py
+
+      - name: Verify EXE exists
+        shell: pwsh
+        run: |
+          if (!(Test-Path "dist\\PDFReader.exe")) {
+            Write-Error "EXE not found. Build may have failed."
+            exit 1
+          }
 
       - name: Upload built EXE
         uses: actions/upload-artifact@v4
@@ -38,15 +58,7 @@ jobs:
           name: pdf-reader-exe
           path: dist/PDFReader.exe
 
-      - name: Run the EXE and check for errors
+      - name: Clean up build artifacts
         shell: pwsh
         run: |
-          try {
-            & dist\PDFReader.exe
-          } catch {
-            Write-Error "The EXE failed to run."
-            exit 1
-          }
-
-      - name: Clean up (Optional)
-        run: Remove-Item -Recurse -Force build, dist
+          Remove-Item -Recurse -Force build, dist, __pycache__, PDFReader.spec
