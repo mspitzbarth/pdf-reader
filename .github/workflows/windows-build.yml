@@ -8,6 +8,7 @@ on:
 jobs:
   build-windows-exe:
     runs-on: windows-latest
+    continue-on-error: false
 
     steps:
       - name: Checkout code
@@ -24,15 +25,12 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Check Python file for errors
-        run: |
-          # Run a Python syntax check on the main.py to ensure there are no errors
-          python -m py_compile main.py
+      - name: Check Python file for syntax errors
+        run: python -m py_compile main.py
 
       - name: Build EXE with PyInstaller
         run: |
-          # Ensure that pandas and numpy are included, and use the correct flags to avoid missing imports
-          pyinstaller --onefile --name PDFReader --hidden-import=pandas --collect-all=pandas --hidden-import=numpy main.py
+          pyinstaller --onefile --name PDFReader main.py
 
       - name: Upload built EXE
         uses: actions/upload-artifact@v4
@@ -41,11 +39,14 @@ jobs:
           path: dist/PDFReader.exe
 
       - name: Run the EXE and check for errors
+        shell: pwsh
         run: |
-          # Run the generated EXE and capture any errors
-          dist/PDFReader.exe || exit 1  # This will cause the job to fail if the EXE runs with an error
+          try {
+            & dist\PDFReader.exe
+          } catch {
+            Write-Error "The EXE failed to run."
+            exit 1
+          }
 
       - name: Clean up (Optional)
-        run: |
-          # Clean up the dist and build directories if necessary
-          rm -rf build dist
+        run: Remove-Item -Recurse -Force build, dist
