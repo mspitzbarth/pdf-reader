@@ -26,13 +26,13 @@ jobs:
 
       - name: Build EXE with PyInstaller
         run: |
-          pyinstaller --onefile --name PDFReader ^
-            --hidden-import=pandas ^
-            --hidden-import=numpy ^
-            --hidden-import=pdfplumber ^
-            --hidden-import=pdfminer.six ^
-            --hidden-import=openpyxl ^
-            --hidden-import=tkinter ^
+          pyinstaller --onefile --name PDFReader `
+            --hidden-import=pandas `
+            --hidden-import=numpy `
+            --hidden-import=pdfplumber `
+            --hidden-import=pdfminer.six `
+            --hidden-import=openpyxl `
+            --hidden-import=tkinter `
             main.py
 
       - name: Upload built EXE
