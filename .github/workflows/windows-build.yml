@@ -1,3 +1,11 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches:
+      - main # Trigger on push to the 'main' branch
+  workflow_dispatch: # Allow manual trigger from the GitHub Actions UI
+
 jobs:
   build-windows-exe:
     runs-on: windows-latest # Use the latest Windows runner
@@ -30,7 +38,6 @@ jobs:
       - name: Check import_test.py for missing dependencies
         shell: pwsh
         run: |
-          # Check for missing dependencies in import_test.py
           $missing = python ./tests/import_test.py
           if ($missing) {
             Write-Error "Missing dependencies: $missing"
@@ -40,7 +47,7 @@ jobs:
           }
 
       - name: Check Python file for syntax errors
-        run: python -m py_compile main.py # Quickly catch any syntax issues before building
+        run: python -m py_compile main.py
 
       - name: Build EXE with PyInstaller
         shell: pwsh
