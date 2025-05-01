@@ -21,9 +21,21 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip  # Ensure pip is up-to-date
-          pip install -r requirements.txt      # Install your app's requirements
-          pip install pyinstaller pyinstaller-hooks-contrib  # Install PyInstaller and extra hooks
+          python -m pip install --upgrade pip
+          pip install pandas numpy pdfplumber openpyxl tkinterdnd2
+          pip install pyinstaller pyinstaller-hooks-contrib
+
+      - name: Check import_test.py for missing dependencies
+        shell: pwsh
+        run: |
+          # Check for missing dependencies in import_test.py
+          $missing = python ./tests/import_test.py
+          if ($missing) {
+            Write-Error "Missing dependencies: $missing"
+            exit 1
+          } else {
+            Write-Output "All dependencies are present."
+          }
 
       - name: Check Python file for syntax errors
         run: python -m py_compile main.py # Quickly catch any syntax issues before building
@@ -39,7 +51,7 @@ jobs:
           # --hidden-import: ensure hidden dependencies are bundled
           pyinstaller --noconsole --onefile --name PDFReader `
             --collect-submodules pandas `
-            --collect-all numpy `
+            --collect-submodules numpy `
             --collect-all pdfplumber `
             --collect-all tkinterdnd2 `
             --hidden-import openpyxl.styles `
