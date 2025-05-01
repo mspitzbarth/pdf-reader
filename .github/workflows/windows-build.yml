@@ -30,7 +30,7 @@ jobs:
       - name: Build EXE with PyInstaller
         shell: pwsh
         run: |
-          pyinstaller --noconsole --onefile --name PDFReader `
+          pyinstaller --onefile --name PDFReader `
             --collect-all pandas `
             --collect-all numpy `
             --collect-all pdfplumber `
