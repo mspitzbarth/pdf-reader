@@ -24,19 +24,28 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
+      - name: Check Python file for errors
+        run: |
+          # Run a Python syntax check on the main.py to ensure there are no errors
+          python -m py_compile main.py
+
       - name: Build EXE with PyInstaller
         run: |
-          pyinstaller --onefile --name PDFReader `
-            --hidden-import=pandas `
-            --hidden-import=numpy `
-            --hidden-import=pdfplumber `
-            --hidden-import=pdfminer.six `
-            --hidden-import=openpyxl `
-            --hidden-import=tkinter `
-            main.py
+          # Ensure that pandas and numpy are included, and use the correct flags to avoid missing imports
+          pyinstaller --onefile --name PDFReader --hidden-import=pandas --collect-all=pandas --hidden-import=numpy main.py
 
       - name: Upload built EXE
         uses: actions/upload-artifact@v4
         with:
           name: pdf-reader-exe
           path: dist/PDFReader.exe
+
+      - name: Run the EXE and check for errors
+        run: |
+          # Run the generated EXE and capture any errors
+          dist/PDFReader.exe || exit 1  # This will cause the job to fail if the EXE runs with an error
+
+      - name: Clean up (Optional)
+        run: |
+          # Clean up the dist and build directories if necessary
+          rm -rf build dist
