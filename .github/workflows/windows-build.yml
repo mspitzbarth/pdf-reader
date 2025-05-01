@@ -31,6 +31,7 @@ jobs:
         shell: pwsh
         run: |
           pyinstaller --onefile --name PDFReader `
+            --additional-hooks-dir pyinstaller-hooks `
             --collect-all pandas `
             --collect-all numpy `
             --collect-all pdfplumber `
