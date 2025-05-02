@@ -30,6 +30,12 @@ python main.py
 
 Or download the latest Windows EXE from the [releases page](https://github.com/mspitzbarth/pdf-reader/releases).
 
+## Sample Data
+
+Sample PDF files for testing are located in the `fixtures/` directory:
+
+- `Tabelle Biogas, Pumpe Störung, Wärmemenge kom. Januar 2025.pdf`
+
 ## Build Windows EXE
 
 This project uses [GitHub Actions](https://github.com/mspitzbarth/pdf-reader/actions) to automatically build the EXE for Windows. The build badge above shows the status of the latest build.
