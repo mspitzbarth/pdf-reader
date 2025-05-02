@@ -2,17 +2,12 @@ name: Build Windows EXE
 
 on:
   push:
-    branches:
-      - main
     tags:
-      - "v*" # Also trigger on version tags
+      - "v*" # Trigger only on version tags like v1.0.0
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
-  build:
+  build-windows-exe:
     runs-on: windows-latest
 
     steps:
@@ -66,25 +61,33 @@ jobs:
             exit 1
           }
 
+      - name: Run the EXE and check for errors
+        shell: pwsh
+        run: |
+          Write-Output "Running EXE..."
+          try {
+            $proc = Start-Process -FilePath "dist\\PDFReader.exe" -PassThru
+            Start-Sleep -Seconds 5
+            if ($proc.HasExited) {
+              Write-Error "The EXE exited early with code $($proc.ExitCode)"
+              exit $proc.ExitCode
+            } else {
+              Stop-Process -Id $proc.Id
+              Write-Output "EXE launched successfully."
+            }
+          } catch {
+            Write-Error "Failed to launch or monitor EXE."
+            exit 1
+          }
+
       - name: Upload built EXE as artifact
         uses: actions/upload-artifact@v4
         with:
           name: pdf-reader-exe
           path: dist/PDFReader.exe
 
-  release:
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: windows-latest
-
-    steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: pdf-reader-exe
-          path: dist
-
       - name: Publish to GitHub Releases
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v1
         with:
           name: PDFReader ${{ github.ref_name }}
@@ -92,3 +95,8 @@ jobs:
           files: dist/PDFReader.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean up build artifacts
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force build, dist, __pycache__, PDFReader.spec
