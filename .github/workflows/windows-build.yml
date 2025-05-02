@@ -1,4 +1,4 @@
-name: Build Windows EXE
+name: Build and Release Windows EXE
 
 on:
   push:
@@ -7,12 +7,13 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-windows-exe:
+  setup:
+    name: Install & Cache Dependencies
     runs-on: windows-latest
-
+    outputs:
+      python-version: "3.10"
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       - name: Cache Python dependencies
         uses: actions/cache@v3
@@ -30,16 +31,41 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt --verbose
-          pip show pandas
+          pip install -r requirements.txt
 
-      - name: List installed packages
-        run: pip list
+  check:
+    name: Lint / Syntax Check
+    needs: setup
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
 
-      - name: Check Python file for syntax errors
+      - name: Install requirements
+        run: pip install -r requirements.txt
+
+      - name: Check syntax
         run: python -m py_compile main.py
 
-      - name: Build EXE with PyInstaller
+  build:
+    name: Build EXE
+    needs: check
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install requirements
+        run: pip install -r requirements.txt
+
+      - name: Build with PyInstaller
         shell: pwsh
         run: |
           pyinstaller --noconsole --onefile --name PDFReader `
@@ -57,46 +83,62 @@ jobs:
         shell: pwsh
         run: |
           if (!(Test-Path "dist\\PDFReader.exe")) {
-            Write-Error "EXE not found. Build may have failed."
+            Write-Error "EXE not found."
             exit 1
           }
 
-      - name: Run the EXE and check for errors
-        shell: pwsh
-        run: |
-          Write-Output "Running EXE..."
-          try {
-            $proc = Start-Process -FilePath "dist\\PDFReader.exe" -PassThru
-            Start-Sleep -Seconds 5
-            if ($proc.HasExited) {
-              Write-Error "The EXE exited early with code $($proc.ExitCode)"
-              exit $proc.ExitCode
-            } else {
-              Stop-Process -Id $proc.Id
-              Write-Output "EXE launched successfully."
-            }
-          } catch {
-            Write-Error "Failed to launch or monitor EXE."
-            exit 1
-          }
-
-      - name: Upload built EXE as artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: pdf-reader-exe
           path: dist/PDFReader.exe
 
+  test:
+    name: Launch EXE and Monitor
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - name: Download built EXE
+        uses: actions/download-artifact@v4
+        with:
+          name: pdf-reader-exe
+          path: dist
+
+      - name: Test EXE
+        shell: pwsh
+        run: |
+          try {
+            $proc = Start-Process -FilePath "dist\\PDFReader.exe" -PassThru
+            Start-Sleep -Seconds 5
+            if ($proc.HasExited) {
+              Write-Error "EXE exited early with code $($proc.ExitCode)"
+              exit $proc.ExitCode
+            } else {
+              Stop-Process -Id $proc.Id
+              Write-Output "EXE launched and stayed alive for 5 seconds."
+            }
+          } catch {
+            Write-Error "EXE failed to launch"
+            exit 1
+          }
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download EXE artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pdf-reader-exe
+          path: ./release
+
       - name: Publish to GitHub Releases
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v1
         with:
           name: PDFReader ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}
-          files: dist/PDFReader.exe
+          files: ./release/PDFReader.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Clean up build artifacts
-        shell: pwsh
-        run: |
-          Remove-Item -Recurse -Force build, dist, __pycache__, PDFReader.spec
