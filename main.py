@@ -105,7 +105,9 @@ class PDFExtractorApp(tk.Tk):
         style.configure("TNotebook", background="#f0f0f0", borderwidth=0)
         style.configure("TNotebook.Tab", font=("Arial", 11), padding=[10, 5])
 
-        self.resizable(False, False)
+        self.resizable(True, True)
+        self.minsize(650, 600)
+
 
         self.pdf_path = None
         self.xlsx_path = None
