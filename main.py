@@ -8,6 +8,7 @@ from openpyxl.formatting.rule import CellIsRule
 import warnings
 import threading
 import subprocess
+import time
 
 warnings.filterwarnings("ignore")
 
@@ -90,6 +91,7 @@ class PDFExtractorApp(tk.Tk):
         # ---- Treeview Styling ----
         style = ttk.Style(self)
         style.theme_use("clam")
+        style.configure("blue.Horizontal.TProgressbar", troughcolor="#e0e0e0", background="#4a90e2", thickness=20)
         style.configure("Treeview",
                         background="#ffffff",
                         foreground="#000000",
@@ -142,7 +144,8 @@ class PDFExtractorApp(tk.Tk):
         progress_frame = tk.Frame(self, bg="#f0f0f0")
         progress_frame.pack(pady=10)
 
-        self.progress = ttk.Progressbar(progress_frame, orient="horizontal", mode="determinate", length=600)
+        self.progress = ttk.Progressbar(progress_frame, orient="horizontal", mode="determinate", length=600, style="blue.Horizontal.TProgressbar")
+
         self.progress.pack(pady=5)
 
         self.progress_label = tk.Label(progress_frame, text="Noch keine Datei geladen",
@@ -162,6 +165,8 @@ class PDFExtractorApp(tk.Tk):
         # == Treeviews in each tab ==
         self.trees = {}
         self.count_labels = {}
+        self.empty_labels = {}
+
         for key, frame in self.tabs.items():
             columns = [
                 "Datum",
@@ -169,11 +174,17 @@ class PDFExtractorApp(tk.Tk):
                 "Archiv.Biogasanlage.Pumpe Störung",
                 "Archiv.Wärmezähler.Biogasanlage.rZaehlerstand_kommuliert"
             ]
+
+            # Placeholder label (initially visible, will be hidden later)
+            empty_label = tk.Label(frame, text="Daten müssen erst verarbeitet werden", font=("Arial", 11, "italic"), bg="#ffffff", fg="gray")
+            empty_label.pack(expand=True)
+            self.empty_labels[key] = empty_label
+
             tree = ttk.Treeview(frame, columns=columns, show="headings")
             for col in columns:
                 tree.heading(col, text=col)
                 tree.column(col, width=220, anchor="center")
-            tree.pack(side="top", fill="both", expand=True, pady=(5, 0), padx=5)
+            tree.pack_forget()  # Hide until data is loaded
 
             scrollbar = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
             tree.configure(yscrollcommand=scrollbar.set)
@@ -181,6 +192,7 @@ class PDFExtractorApp(tk.Tk):
 
             count_label = tk.Label(frame, text="", font=("Arial", 10), bg="#ffffff", fg="black")
             count_label.pack(side="bottom", pady=8)
+            count_label.pack_forget()
 
             # Add zebra striping tags
             tree.tag_configure('oddrow', background='#f9f9f9')
@@ -220,21 +232,35 @@ class PDFExtractorApp(tk.Tk):
 
             if self.df is not None:
                 total_rows = len(self.df)
+                if total_rows == 0:
+                    messagebox.showinfo("Keine Daten", "Keine gültigen Tabellen gefunden.")
+                    self.progress_label.config(text="Keine Daten gefunden.")
+                    return
+
                 above = self.df[self.df["Archiv.Biogasanlage.VL PRI"] > threshold]
                 below = self.df[self.df["Archiv.Biogasanlage.VL PRI"] <= threshold]
 
                 for tree in self.trees.values():
                     tree.delete(*tree.get_children())
 
+                self.progress["maximum"] = total_rows
+                self.progress["value"] = 0
+
+                # Insert all rows with progress
                 for idx, row in enumerate(self.df.iterrows(), start=1):
                     _, data = row
                     tag = 'evenrow' if idx % 2 == 0 else 'oddrow'
                     self.trees["Gesamte Zeilen"].insert("", "end", values=list(data), tags=(tag,))
+                    self.progress["value"] = idx
+                    self.progress_label.config(text=f"Verarbeite Zeile {idx}/{total_rows}")
+                    self.progress.update_idletasks()
+                    time.sleep(0.001)  # Optional: makes progress visible
 
+                # Insert filtered rows
                 for i, (_, data) in enumerate(above.iterrows(), start=1):
                     tag = 'evenrow' if i % 2 == 0 else 'oddrow'
                     self.trees["Werte > Schwellwert"].insert("", "end", values=list(data), tags=(tag,))
-
+                
                 for i, (_, data) in enumerate(below.iterrows(), start=1):
                     tag = 'evenrow' if i % 2 == 0 else 'oddrow'
                     self.trees["Werte ≤ Schwellwert"].insert("", "end", values=list(data), tags=(tag,))
@@ -245,20 +271,35 @@ class PDFExtractorApp(tk.Tk):
                     f"Werte ≤ {threshold}": len(below)
                 }
 
-                self.count_labels["Gesamte Zeilen"].config(text=f"Zeilen insgesamt: {total_rows}")
-                self.count_labels["Werte > Schwellwert"].config(text=f"Werte > {threshold}: {len(above)}")
-                self.count_labels["Werte ≤ Schwellwert"].config(text=f"Werte ≤ {threshold}: {len(below)}")
+                above_percent = (len(above) / total_rows) * 100 if total_rows else 0
+                below_percent = (len(below) / total_rows) * 100 if total_rows else 0
 
-                self.progress["value"] = 100
+                self.count_labels["Gesamte Zeilen"].config(
+                    text=f"Zeilen insgesamt: {total_rows}"
+                )
+                self.count_labels["Werte > Schwellwert"].config(
+                    text=f"Werte > {threshold}: {len(above)} ({above_percent:.2f}%)"
+                )
+                self.count_labels["Werte ≤ Schwellwert"].config(
+                    text=f"Werte ≤ {threshold}: {len(below)} ({below_percent:.2f}%)"
+                )
+
+
+                self.progress_label.config(text="Verarbeitung abgeschlossen.")
+                self.progress["value"] = total_rows
 
                 # Save and apply conditional formatting
                 output_path = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel Dateien", "*.xlsx")])
                 if output_path:
                     save_with_stats(self.df, output_path, stats, threshold, threshold)
 
-                self.progress_label.config(text="Verarbeitung abgeschlossen.")
                 self.start_button.config(state="normal")
                 self.open_button.config(state="normal")
+
+                for key in self.trees:
+                    self.trees[key].pack(side="top", fill="both", expand=True, pady=(5, 0), padx=5)
+                    self.count_labels[key].pack(side="bottom", pady=8)
+                    self.empty_labels[key].pack_forget()
         threading.Thread(target=worker).start()
 
     # Excel Datei öffnen
